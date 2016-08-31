@@ -65,7 +65,7 @@ function RedisBroker(broker_url) {
     self.end = function() {
       self.redis.end();
     };
-    
+
     self.disconnect = function() {
         self.redis.end();
     };
@@ -246,13 +246,17 @@ function Task(client, name, options, exchange) {
 
     self.publish = function (args, kwargs, options, callback) {
         var id = options.id || uuid.v4();
-
+        var priority = options.priority || self.options.priority;
+        delete options.priority;
         queue = options.queue || self.options.queue || queue || self.client.conf.DEFAULT_QUEUE;
         var msg = createMessage(self.name, args, kwargs, options, id);
         var pubOptions = {
             'contentType': 'application/json',
             'contentEncoding': 'utf-8'
         };
+        if (priority) {
+          pubOptions.priority = priority;
+        }
 
         if (exchange) {
             exchange.publish(queue, msg, pubOptions, callback);
