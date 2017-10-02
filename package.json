@@ -12,8 +12,18 @@
         "url": "git://github.com/mher/node-celery.git"
     },
     "devDependencies": {
+        "eslint": "4.8.0",
+        "eslint-config-airbnb-base": "12.0.1",
+        "eslint-plugin-import": "2.7.0",
+        "eslint-plugin-mocha-no-only": "0.0.5",
         "mocha": "*"
     },
-    "engine": "node >= 0.8.2",
-    "main": "celery.js"
+    "engines": {
+      "node": "8.5.0",
+      "npm": "5.4.2"
+    },
+    "main": "celery.js",
+    "scripts": {
+      "lint": "eslint --color celery.js protocol.js"
+    }
 }
