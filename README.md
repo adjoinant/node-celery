@@ -14,8 +14,7 @@ Simple example, included as [examples/hello-world.js](https://github.com/mher/no
 ```javascript
 var celery = require('node-celery'),
 	client = celery.createClient({
-		CELERY_BROKER_URL: 'amqp://guest:guest@localhost:5672//',
-		CELERY_RESULT_BACKEND: 'amqp'
+		CELERY_BROKER_URL: 'amqp://guest:guest@localhost:5672//'
 	});
 
 client.on('error', function(err) {
@@ -60,8 +59,7 @@ var celery = require('node-celery'),
 				certFile: '/path/to/certFile.pem',
 				caFile: '/path/to/caFile.pem'
 			}
-		},
-		CELERY_RESULT_BACKEND: 'amqp'
+		}
 	});
 ```
 
@@ -104,32 +102,14 @@ client.on('connect', function() {
 
 ### Backends
 
-The backend is used to store task results. Currently AMQP (RabbitMQ) and Redis backends are supported.
-
-```javascript
-var celery = require('node-celery'),
-	client = celery.createClient({
-		CELERY_BROKER_URL: 'amqp://guest:guest@localhost:5672//',
-		CELERY_RESULT_BACKEND: 'redis://localhost/0'
-	});
-
-client.on('connect', function() {
-	var result = client.call('tasks.add', [1, 2]);
-	setTimeout(function() {
-		result.get(function(data) {
-			console.log(data); // data will be null if the task is not finished
-		});
-	}, 2000);
-});
-```
+The backend is used to store task results. Currently only AMQP (RabbitMQ) backend is supported.
 
 AMQP backend allows to subscribe to the task result and get it immediately, without polling:
 
 ```javascript
 var celery = require('node-celery'),
 	client = celery.createClient({
-		CELERY_BROKER_URL: 'amqp://guest:guest@localhost:5672//',
-		CELERY_RESULT_BACKEND: 'amqp'
+		CELERY_BROKER_URL: 'amqp://guest:guest@localhost:5672//'
 	});
 
 client.on('connect', function() {
@@ -171,4 +151,3 @@ client.on('connect', function() {
 	}); // sends a task to the default queue
 });
 ```
-
