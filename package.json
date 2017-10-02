@@ -19,11 +19,11 @@
         "mocha": "*"
     },
     "engines": {
-      "node": "8.5.0",
-      "npm": "5.4.2"
+        "node": "8.5.0",
+        "npm": "5.4.2"
     },
     "main": "celery/index.js",
     "scripts": {
-      "lint": "eslint --color *.js celery/"
+        "lint": "eslint --color *.js celery/"
     }
 }
