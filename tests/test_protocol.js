@@ -1,6 +1,6 @@
 var assert = require('assert'),
     uuid = require('node-uuid'),
-    createMessage = require('../protocol')
+    createMessage = require('../celery/protocol')
         .createMessage;
 
 
