@@ -1,5 +1,6 @@
 var celery = require('../celery'),
-    assert = require('assert');
+    assert = require('assert'),
+    Task = require('../celery/task');
 
 var conf = { CELERY_BROKER_URL: 'amqp://' };
 
@@ -41,7 +42,7 @@ describe('celery functional tests', function() {
     describe('basic task calls', function() {
         it('should call a task without error', function(done) {
             var client = celery.createClient(conf),
-                add = client.createTask('tasks.add');
+                add = new Task(client, 'tasks.add');
 
             client.on('connect', function() {
                 add.call([1, 2]);
@@ -60,7 +61,7 @@ describe('celery functional tests', function() {
     describe('result handling with amqp backend', function() {
         it('should return a task result', function(done) {
             var client = celery.createClient(conf),
-                add = client.createTask('tasks.add');
+                add = new Task(client, 'tasks.add');
 
             client.on('connect', function() {
                 var result = add.call([1, 2]);
@@ -79,7 +80,7 @@ describe('celery functional tests', function() {
     describe('eta', function() {
         it('should call a task with a delay', function(done) {
             var client = celery.createClient(conf),
-                time = client.createTask('tasks.time');
+                time = new Task(client, 'tasks.time');
 
             client.on('connect', function() {
                 var start = new Date()
@@ -103,7 +104,7 @@ describe('celery functional tests', function() {
     describe('expires', function() {
         it('should call a task which expires', function(done) {
             var client = celery.createClient(conf),
-                time = client.createTask('tasks.time');
+                time = new Task(client, 'tasks.time');
 
             client.on('connect', function() {
                 var past = new Date(new Date()

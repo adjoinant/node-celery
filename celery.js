@@ -61,10 +61,6 @@ function Client(conf) {
 
 util.inherits(Client, events.EventEmitter);
 
-Client.prototype.createTask = function(name, options, exchange) {
-    return new Task(this, name, options, exchange);
-};
-
 Client.prototype.end = function() {
     this.broker.disconnect();
 };
@@ -85,8 +81,8 @@ Client.prototype.call = function(name /*[args], [kwargs], [options], [callback]*
         }
     }
 
-    var task = this.createTask(name),
-        result = task.call(args, kwargs, options);
+    var task = new Task(this, name);
+    var result = task.call(args, kwargs, options);
 
     if (callback && result) {
         debug('Subscribing to result...');
@@ -95,17 +91,17 @@ Client.prototype.call = function(name /*[args], [kwargs], [options], [callback]*
     return result;
 };
 
-function Task(client, name, options, exchange) {
+function Task(client, name) {
     var self = this;
 
     self.client = client;
     self.name = name;
-    self.options = options || {};
+    self.options = {};
 
     var route = self.client.conf.ROUTES[name],
         queue = route && route.queue;
 
-    self.publish = function (args, kwargs, options, callback) {
+    self.publish = function (args, kwargs, options) {
         var id = options.id || uuid.v4();
         var priority = options.priority || self.options.priority;
         delete options.priority;
@@ -119,17 +115,13 @@ function Task(client, name, options, exchange) {
           pubOptions.priority = priority;
         }
 
-        if (exchange) {
-            exchange.publish(queue, msg, pubOptions, callback);
-        } else {
-            self.client.broker.publish(queue, msg, pubOptions, callback);
-        }
+        self.client.broker.publish(queue, msg, pubOptions);
 
         return new Result(id, self.client);
     };
 }
 
-Task.prototype.call = function(args, kwargs, options, callback) {
+Task.prototype.call = function(args, kwargs, options) {
     var self = this;
 
     args = args || [];
@@ -140,7 +132,7 @@ Task.prototype.call = function(args, kwargs, options, callback) {
         self.client.emit('error', 'Client is not ready');
     }
     else {
-        return self.publish(args, kwargs, options, callback);
+        return self.publish(args, kwargs, options);
     }
 };
 
@@ -161,7 +153,6 @@ function Result(taskid, client) {
             'durable': self.client.conf.TASK_RESULT_DURABLE,
             'closeChannelOnUnsubscribe': true
         },
-
         function (q) {
             q.bind(self.client.conf.RESULT_EXCHANGE, '#');
             var ctag;
