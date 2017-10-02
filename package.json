@@ -4,8 +4,8 @@
     "description": "Celery client for Node",
     "author": "Mher Movsisyan <mher.movsisyan@gmail.com>",
     "dependencies": {
-        "amqp": "*",
-        "node-uuid": "*"
+        "amqp": "0.2.6",
+        "uuid": "3.1.0"
     },
     "repository": {
         "type": "git",

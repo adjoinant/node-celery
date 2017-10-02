@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 const Result = require('./result');
-const uuid = require('node-uuid');
+const uuidv4 = require('uuid/v4');
 
 const { createMessage } = require('./protocol');
 
@@ -13,10 +13,8 @@ module.exports = class Task {
   }
 
   publish(args, kwargs, options = {}) {
-    const id = options.id || uuid.v4();
     const { priority } = options;
     delete options.priority;
-    const msg = createMessage(this.name, args, kwargs, options, id);
     const pubOptions = {
       contentType: 'application/json',
       contentEncoding: 'utf-8',
@@ -25,8 +23,9 @@ module.exports = class Task {
       pubOptions.priority = priority;
     }
 
+    const id = options.id || uuidv4();
+    const msg = createMessage(this.name, args, kwargs, options, id);
     this.client.broker.publish(this.queue, msg, pubOptions);
-
     return new Result(id, this.client);
   }
 

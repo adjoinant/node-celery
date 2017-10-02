@@ -1,4 +1,4 @@
-const uuid = require('node-uuid');
+const uuidv4 = require('uuid/v4');
 
 const fields = ['task', 'id', 'args', 'kwargs', 'retries', 'eta', 'expires', 'queue',
   'taskset', 'chord', 'utc', 'callbacks', 'errbacks', 'timeouts'];
@@ -18,7 +18,7 @@ function createMessage(task, args, kwargs, options, id) {
     kwargs,
   };
 
-  message.id = id || uuid.v4();
+  message.id = id || uuidv4();
   for (const o in options) {
     if ({}.hasOwnProperty.call(options, o)) {
       if (fields.indexOf(o) === -1) {
