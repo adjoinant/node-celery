@@ -1,182 +1,184 @@
-var url = require('url'),
-    util = require('util'),
-    amqp = require('amqp'),
-    events = require('events'),
-    uuid = require('node-uuid');
+/* eslint-disable no-console */
+const util = require('util');
+const amqp = require('amqp');
+const events = require('events');
+const uuid = require('node-uuid');
 
-var createMessage = require('./protocol').createMessage;
+const { createMessage } = require('./protocol');
 
-
-debug = process.env.NODE_CELERY_DEBUG === '1' ? console.info : function() {};
+const debug = process.env.NODE_CELERY_DEBUG === '1' ? console.info : () => {};
 
 function Configuration(options) {
-    var self = this;
+  const self = this;
 
-    for (var o in options) {
-        if (options.hasOwnProperty(o)) {
-            self[o.replace(/^CELERY_/, '')] = options[o];
-        }
+  for (const o in options) {
+    if ({}.hasOwnProperty.call(options, o)) {
+      self[o.replace(/^CELERY_/, '')] = options[o];
     }
+  }
 
-    self.BROKER_URL = self.BROKER_URL || 'amqp://';
-    self.BROKER_OPTIONS = self.BROKER_OPTIONS || { url: self.BROKER_URL, heartbeat: 580 };
-    self.DEFAULT_QUEUE = self.DEFAULT_QUEUE || 'celery';
-    self.DEFAULT_EXCHANGE = self.DEFAULT_EXCHANGE || '';
-    self.DEFAULT_EXCHANGE_TYPE = self.DEFAULT_EXCHANGE_TYPE || 'direct';
-    self.DEFAULT_ROUTING_KEY = self.DEFAULT_ROUTING_KEY || 'celery';
-    self.RESULT_EXCHANGE = self.RESULT_EXCHANGE || 'celeryresults';
-    self.TASK_RESULT_EXPIRES = self.TASK_RESULT_EXPIRES * 1000 || 86400000; // Default 1 day
-    self.TASK_RESULT_DURABLE = undefined !== self.TASK_RESULT_DURABLE ? self.TASK_RESULT_DURABLE : true; // Set Durable true by default (Celery 3.1.7)
-    self.ROUTES = self.ROUTES || {};
+  self.BROKER_URL = self.BROKER_URL || 'amqp://';
+  self.BROKER_OPTIONS = self.BROKER_OPTIONS || { url: self.BROKER_URL, heartbeat: 580 };
+  self.DEFAULT_QUEUE = self.DEFAULT_QUEUE || 'celery';
+  self.DEFAULT_EXCHANGE = self.DEFAULT_EXCHANGE || '';
+  self.DEFAULT_EXCHANGE_TYPE = self.DEFAULT_EXCHANGE_TYPE || 'direct';
+  self.DEFAULT_ROUTING_KEY = self.DEFAULT_ROUTING_KEY || 'celery';
+  self.RESULT_EXCHANGE = self.RESULT_EXCHANGE || 'celeryresults';
+  self.TASK_RESULT_EXPIRES = self.TASK_RESULT_EXPIRES * 1000 || 86400000; // Default 1 day
+  self.TASK_RESULT_DURABLE =
+    undefined !== self.TASK_RESULT_DURABLE
+      ? self.TASK_RESULT_DURABLE
+      : true; // Set Durable true by default (Celery 3.1.7)
+  self.ROUTES = self.ROUTES || {};
 }
 
 function Client(conf) {
-    var self = this;
+  const self = this;
 
-    self.conf = new Configuration(conf);
+  self.conf = new Configuration(conf);
 
-    self.ready = false;
+  self.ready = false;
 
-    debug('Connecting to broker...');
-    self.broker = amqp.createConnection(
-      self.conf.BROKER_OPTIONS, {
-        defaultExchangeName: self.conf.DEFAULT_EXCHANGE
-    });
+  debug('Connecting to broker...');
+  self.broker = amqp.createConnection(self.conf.BROKER_OPTIONS, {
+    defaultExchangeName: self.conf.DEFAULT_EXCHANGE,
+  });
 
-    self.broker.on('ready', function() {
-        debug('Broker connected...');
-        self.ready = true;
-        debug('Emiting connect event...');
-        self.emit('connect');
-    });
+  self.broker.on('ready', () => {
+    debug('Broker connected...');
+    self.ready = true;
+    debug('Emiting connect event...');
+    self.emit('connect');
+  });
 
-    self.broker.on('error', function(err) {
-        self.emit('error', err);
-    });
+  self.broker.on('error', (err) => {
+    self.emit('error', err);
+  });
 
-    self.broker.on('end', function() {
-        self.emit('end');
-    });
+  self.broker.on('end', () => {
+    self.emit('end');
+  });
 }
 
 util.inherits(Client, events.EventEmitter);
 
-Client.prototype.end = function() {
-    this.broker.disconnect();
+Client.prototype.end = function end() {
+  this.broker.disconnect();
 };
 
-Client.prototype.call = function(name /*[args], [kwargs], [options], [callback]*/ ) {
-    var args, kwargs, options, callback;
-    for (var i = arguments.length - 1; i > 0; i--) {
-        if (typeof arguments[i] === 'function') {
-            callback = arguments[i];
-        } else if (Array.isArray(arguments[i])) {
-            args = arguments[i];
-        } else if (typeof arguments[i] === 'object') {
-            if (options) {
-                kwargs = arguments[i];
-            } else {
-                options = arguments[i];
-            }
-        }
+Client.prototype.call = function call(
+  name,
+  ...rest /* [args], [kwargs], [options], [callback] */
+) {
+  let args;
+  let kwargs;
+  let options;
+  let callback;
+  rest.reverse().forEach((param) => {
+    if (typeof param === 'function') {
+      callback = param;
+    } else if (Array.isArray(param)) {
+      args = param;
+    } else if (typeof param === 'object') {
+      if (options) {
+        kwargs = param;
+      } else {
+        options = param;
+      }
     }
+  });
 
-    var task = new Task(this, name);
-    var result = task.call(args, kwargs, options);
+  const task = new Task(this, name);
+  const result = task.call(args, kwargs, options);
 
-    if (callback && result) {
-        debug('Subscribing to result...');
-        result.on('ready', callback);
-    }
-    return result;
+  if (callback && result) {
+    debug('Subscribing to result...');
+    result.on('ready', callback);
+  }
+  return result;
 };
 
 function Task(client, name) {
-    var self = this;
+  const self = this;
 
-    self.client = client;
-    self.name = name;
-    self.options = {};
+  self.client = client;
+  self.name = name;
+  self.options = {};
 
-    var route = self.client.conf.ROUTES[name],
-        queue = route && route.queue;
+  const route = self.client.conf.ROUTES[name];
+  let queue = route && route.queue;
 
-    self.publish = function (args, kwargs, options) {
-        var id = options.id || uuid.v4();
-        var priority = options.priority || self.options.priority;
-        delete options.priority;
-        queue = options.queue || self.options.queue || queue || self.client.conf.DEFAULT_QUEUE;
-        var msg = createMessage(self.name, args, kwargs, options, id);
-        var pubOptions = {
-            'contentType': 'application/json',
-            'contentEncoding': 'utf-8'
-        };
-        if (priority) {
-          pubOptions.priority = priority;
-        }
-
-        self.client.broker.publish(queue, msg, pubOptions);
-
-        return new Result(id, self.client);
+  self.publish = function pub(args, kwargs, options) {
+    const id = options.id || uuid.v4();
+    const priority = options.priority || self.options.priority;
+    delete options.priority;
+    queue = options.queue || self.options.queue || queue || self.client.conf.DEFAULT_QUEUE;
+    const msg = createMessage(self.name, args, kwargs, options, id);
+    const pubOptions = {
+      contentType: 'application/json',
+      contentEncoding: 'utf-8',
     };
+    if (priority) {
+      pubOptions.priority = priority;
+    }
+
+    self.client.broker.publish(queue, msg, pubOptions);
+
+    return new Result(id, self.client);
+  };
 }
 
-Task.prototype.call = function(args, kwargs, options) {
-    var self = this;
+Task.prototype.call = function taskCall(args, kwargs, options) {
+  const self = this;
 
-    args = args || [];
-    kwargs = kwargs || {};
-    options = options || self.options || {};
+  args = args || [];
+  kwargs = kwargs || {};
+  options = options || self.options || {};
 
-    if (!self.client.ready) {
-        self.client.emit('error', 'Client is not ready');
-    }
-    else {
-        return self.publish(args, kwargs, options);
-    }
+  if (!self.client.ready) {
+    return self.client.emit('error', 'Client is not ready');
+  }
+  return self.publish(args, kwargs, options);
 };
 
 function Result(taskid, client) {
-    var self = this;
+  const self = this;
 
-    events.EventEmitter.call(self);
-    self.taskid = taskid;
-    self.client = client;
-    self.result = null;
+  events.EventEmitter.call(self);
+  self.taskid = taskid;
+  self.client = client;
+  self.result = null;
 
-    debug('Subscribing to result queue...');
-    self.client.broker.queue(
-        self.taskid.replace(/-/g, ''), {
-            "arguments": {
-                'x-expires': self.client.conf.TASK_RESULT_EXPIRES
-            },
-            'durable': self.client.conf.TASK_RESULT_DURABLE,
-            'closeChannelOnUnsubscribe': true
-        },
-        function (q) {
-            q.bind(self.client.conf.RESULT_EXCHANGE, '#');
-            var ctag;
-            q.subscribe(function (message) {
-                if (message.contentType === 'application/x-python-serialize') {
-                    console.error('Celery should be configured with json serializer');
-                    process.exit(1);
-                }
-                self.result = message;
-                q.unsubscribe(ctag);
-                debug('Emiting ready event...');
-                self.emit('ready', message);
-                debug('Emiting task status event...');
-                self.emit(message.status.toLowerCase(), message);
-            }).addCallback(function(ok) { ctag = ok.consumerTag; });
-        });
+  debug('Subscribing to result queue...');
+  self.client.broker.queue(
+    self.taskid.replace(/-/g, ''), {
+      arguments: {
+        'x-expires': self.client.conf.TASK_RESULT_EXPIRES,
+      },
+      durable: self.client.conf.TASK_RESULT_DURABLE,
+      closeChannelOnUnsubscribe: true,
+    },
+    (q) => {
+      q.bind(self.client.conf.RESULT_EXCHANGE, '#');
+      let ctag;
+      q.subscribe((message) => {
+        if (message.contentType === 'application/x-python-serialize') {
+          console.error('Celery should be configured with json serializer');
+          process.exit(1);
+        }
+        self.result = message;
+        q.unsubscribe(ctag);
+        debug('Emiting ready event...');
+        self.emit('ready', message);
+        debug('Emiting task status event...');
+        self.emit(message.status.toLowerCase(), message);
+      }).addCallback((ok) => { ctag = ok.consumerTag; });
+    }
+  );
 }
 
 util.inherits(Result, events.EventEmitter);
 
-exports.createClient = function(config, callback) {
-    return new Client(config, callback);
-};
+exports.createClient = (config, callback) => new Client(config, callback);
 
-exports.createResult = function(taskId, client) {
-    return new Result(taskId, client);
-};
+exports.createResult = (taskId, client) => new Result(taskId, client);
